@@ -1,0 +1,704 @@
+
+SQL> CREATE TABLE Customer31 (
+        customer_id NUMBER PRIMARY KEY,
+        credit_limit NUMBER,
+  4      avg_consumption_rate NUMBER,
+  5      payment_status VARCHAR2(20),
+  6      total_billed_amount NUMBER
+  7  );
+
+SQL> CREATE TABLE MeterReading31(
+  2      reading_id NUMBER PRIMARY KEY,
+  3      customer_id NUMBER,
+  4      reading NUMBER,
+  5      reading_date DATE,
+  6      CONSTRAINT fk_customer FOREIGN KEY (customer_id) REFERENCES Customer31(customer_id)
+  7  );
+
+SQL> CREATE TABLE Invoice31 (
+  2      invoice_id NUMBER PRIMARY KEY,
+  3      customer_id NUMBER,
+  4      amount NUMBER,
+  5      billing_date DATE,
+  6      CONSTRAINT fk_customer_invoice31 FOREIGN KEY (customer_id) REFERENCES Customer31(customer_id)
+  7  );
+
+
+SQL> CREATE TABLE CustomerStats (
+  2      stats_id NUMBER PRIMARY KEY,
+  3      num_invoices NUMBER,
+  4      total_billed_amount NUMBER
+  5  );
+
+
+ INSERT INTO Customer31 VALUES (1, 1000, NULL, 'Paid', 0);
+
+1 row created.
+
+SQL> INSERT INTO Customer31 VALUES (2, 1500, NULL, 'Paid', 0);
+
+1 row created.
+
+SQL> INSERT INTO MeterReading31 VALUES (1, 1, 100, SYSDATE-30);
+
+1 row created.
+
+SQL> INSERT INTO MeterReading31 VALUES (2, 1, 150, SYSDATE);
+
+1 row created.
+
+SQL> INSERT INTO MeterReading31 VALUES (3, 2, 200, SYSDATE-30);
+
+1 row created.
+
+SQL> INSERT INTO MeterReading31 VALUES (4, 2, 250, SYSDATE);
+
+1 row created.
+
+SQL> INSERT INTO Invoice31 VALUES (1, 1, 200, SYSDATE-15);
+
+1 row created.
+
+SQL> INSERT INTO Invoice31 VALUES (2, 2, 300, SYSDATE-15);
+
+1 row created.
+
+SQL> INSERT INTO CustomerStats VALUES (1, 2, 500);
+
+1 row created.
+
+trigger 1:-
+
+CREATE OR REPLACE TRIGGER check_meter_reading
+    BEFORE INSERT ON MeterReading31
+    FOR EACH ROW
+    DECLARE
+        max_reading NUMBER;
+    BEGIN
+        SELECT MAX(reading) INTO max_reading
+        FROM MeterReading31
+        WHERE customer_id = :NEW.customer_id;
+ 
+       IF max_reading IS NOT NULL AND :NEW.reading <= max_reading THEN
+          RAISE_APPLICATION_ERROR(-20001, 'New meter reading must be greater than previous reading.');
+       END IF;
+   END;
+   /
+
+o/p:-
+
+ INSERT INTO MeterReading31 (reading_id, customer_id, reading, reading_date)
+    VALUES (6, 1, 150, SYSDATE);
+INSERT INTO MeterReading31 (reading_id, customer_id, reading, reading_date)
+            *
+ERROR at line 1:
+ORA-20001: New meter reading must be greater than previous reading.
+ORA-06512: at "SYSTEM.CHECK_METER_READING", line 9
+ORA-04088: error during execution of trigger 'SYSTEM.CHECK_METER_READING'
+
+trigger 2:-
+
+ CREATE OR REPLACE TRIGGER update_total_billed_amount
+    AFTER INSERT ON Invoice31
+    FOR EACH ROW
+    BEGIN
+        UPDATE Customer31
+        SET total_billed_amount = total_billed_amount + :NEW.amount
+        WHERE customer_id = :NEW.customer_id;
+    END;
+    /
+
+Trigger created.
+
+o/p
+
+INSERT INTO Invoice31 (invoice_id, customer_id, amount, billing_date)
+   VALUES (6, 2, 500, SYSDATE);
+
+1 row created.
+
+SQL> INSERT INTO Invoice31 (invoice_id, customer_id, amount, billing_date)
+  2  VALUES (4, 2, 500, SYSDATE);
+
+1 row created.
+
+SQL> select * from customer31;
+
+
+
+SQL> SELECT customer_id, total_billed_amount
+    FROM Customer31
+    WHERE customer_id = 2;
+
+CUSTOMER_ID TOTAL_BILLED_AMOUNT
+----------- -------------------
+          2                1000
+INSERT INTO Invoice31 (invoice_id, customer_id, amount, billing_date)
+  2  VALUES (5, 3, 500, SYSDATE);
+INSERT INTO Invoice31 (invoice_id, customer_id, amount, billing_date)
+*
+ERROR at line 1:
+ORA-02291: integrity constraint (SYSTEM.FK_CUSTOMER_INVOICE31) violated -
+parent key not found
+
+
+trigger 3:
+
+ CREATE OR REPLACE TRIGGER check_payment_status
+    BEFORE UPDATE ON Customer31
+    FOR EACH ROW
+    BEGIN
+        IF :NEW.payment_status = 'Overdue' THEN
+            RAISE_APPLICATION_ERROR(-20002, 'Cannot update billing information for overdue accounts.');
+        END IF;
+    END;
+    /
+
+Trigger created.
+
+o/p
+UPDATE Customer31
+    SET payment_status = 'Overdue'
+    WHERE customer_id = 2;
+UPDATE Customer31
+       *
+ERROR at line 1:
+ORA-20002: Cannot update billing information for overdue accounts.
+ORA-06512: at "SYSTEM.CHECK_PAYMENT_STATUS", line 3
+ORA-04088: error during execution of trigger 'SYSTEM.CHECK_PAYMENT_STATUS'
+
+
+
+
+
+packages:-
+
+
+SQL> CREATE TABLE customers231 (
+  2      customer_id NUMBER PRIMARY KEY,
+  3      customer_name VARCHAR2(100),
+  4      customer_address VARCHAR2(255)
+  5  );
+
+Table created.
+
+SQL> INSERT INTO customers231 (customer_id, customer_name, customer_address) VALUES (1, 'John Doe', '123 Main St');
+
+1 row created.
+
+SQL> INSERT INTO customers231 (customer_id, customer_name, customer_address) VALUES (2, 'Jane Smith', '456 Oak St');
+
+1 row created.
+
+SQL> CREATE TABLE meter_readings231 (
+  2      customer_id NUMBER,
+  3      reading_date TIMESTAMP,
+  4      meter_reading NUMBER,
+  5      FOREIGN KEY (customer_id) REFERENCES customers231(customer_id)
+  6  );
+
+Table created.
+
+SQL> INSERT INTO meter_readings31 (customer_id, reading_date, meter_reading) VALUES (1, TO_TIMESTAMP('2024-03-01 12:00:00', 'YYYY-MM-DD HH24:MI:SS'), 1000);
+INSERT INTO meter_readings31 (customer_id, reading_date, meter_reading) VALUES (1, TO_TIMESTAMP('2024-03-01 12:00:00', 'YYYY-MM-DD HH24:MI:SS'), 1000)
+            *
+ERROR at line 1:
+ORA-00942: table or view does not exist
+
+
+SQL> INSERT INTO meter_readings231 (customer_id, reading_date, meter_reading) VALUES (1, TO_TIMESTAMP('2024-03-01 12:00:00', 'YYYY-MM-DD HH24:MI:SS'), 1000);
+
+1 row created.
+
+SQL> INSERT INTO meter_readings231 (customer_id, reading_date, meter_reading) VALUES (1, TO_TIMESTAMP('2024-03-15 12:00:00', 'YYYY-MM-DD HH24:MI:SS'), 1025);
+
+1 row created.
+
+SQL> INSERT INTO meter_readings231 (customer_id, reading_date, meter_reading) VALUES (1, TO_TIMESTAMP('2024-03-31 12:00:00', 'YYYY-MM-DD HH24:MI:SS'), 1050);
+
+1 row created.
+
+SQL> INSERT INTO meter_readings231 (customer_id, reading_date, meter_reading) VALUES (2, TO_TIMESTAMP('2024-03-01 12:00:00', 'YYYY-MM-DD HH24:MI:SS'), 850);
+
+1 row created.
+
+SQL> INSERT INTO meter_readings231 (customer_id, reading_date, meter_reading) VALUES (2, TO_TIMESTAMP('2024-03-15 12:00:00', 'YYYY-MM-DD HH24:MI:SS'), 880);
+
+1 row created.
+
+SQL> INSERT INTO meter_readings231 (customer_id, reading_date, meter_reading) VALUES (2, TO_TIMESTAMP('2024-03-31 12:00:00', 'YYYY-MM-DD HH24:MI:SS'), 910);
+
+1 row created.
+
+SQL> CREATE TABLE bills (
+  2      customer_id NUMBER,
+  3      bill_amount NUMBER,
+  4      bill_date DATE,
+  5      payment_status VARCHAR2(20),
+  6      FOREIGN KEY (customer_id) REFERENCES customers231(customer_id)
+  7  );
+
+Table created.
+
+SQL> INSERT INTO bills (customer_id, bill_amount, bill_date, payment_status) VALUES (1, 7.5, TO_DATE('2024-03-15', 'YYYY-MM-DD'), 'Unpaid');
+
+1 row created.
+
+SQL> INSERT INTO bills (customer_id, bill_amount, bill_date, payment_status) VALUES (1, 7.5, TO_DATE('2024-03-31', 'YYYY-MM-DD'), 'Unpaid');
+
+1 row created.
+
+SQL> INSERT INTO bills (customer_id, bill_amount, bill_date, payment_status) VALUES (2, 3, TO_DATE('2024-03-15', 'YYYY-MM-DD'), 'Unpaid');
+
+1 row created.
+
+SQL> INSERT INTO bills (customer_id, bill_amount, bill_date, payment_status) VALUES (2, 3, TO_DATE('2024-03-31', 'YYYY-MM-DD'), 'Unpaid');
+
+1 row created.
+
+SQL> CREATE TABLE payments (
+  2      customer_id NUMBER,
+  3      payment_amount NUMBER,
+  4      payment_date DATE,
+  5      FOREIGN KEY (customer_id) REFERENCES customers231(customer_id)
+  6  );
+
+Table created.
+
+SQL> INSERT INTO payments (customer_id, payment_amount, payment_date) VALUES (1, 15, TO_DATE('2024-03-20', 'YYYY-MM-DD'));
+
+1 row created.
+
+SQL> INSERT INTO payments (customer_id, payment_amount, payment_date) VALUES (2, 6, TO_DATE('2024-03-25', 'YYYY-MM-DD'));
+
+1 row created.
+
+SQL> CREATE TABLE consumption_history (
+  2      customer_id NUMBER,
+  3      consumption_date TIMESTAMP,
+  4      consumption_amount NUMBER,
+  5      FOREIGN KEY (customer_id) REFERENCES customers231(customer_id)
+  6  );
+
+Table created.
+
+SQL> INSERT INTO consumption_history (customer_id, consumption_date, consumption_amount) VALUES (1, TO_TIMESTAMP('2024-03-15 12:00:00', 'YYYY-MM-DD HH24:MI:SS'), 25);
+
+1 row created.
+
+SQL> INSERT INTO consumption_history (customer_id, consumption_date, consumption_amount) VALUES (1, TO_TIMESTAMP('2024-03-31 12:00:00', 'YYYY-MM-DD HH24:MI:SS'), 25);
+
+1 row created.
+
+SQL> INSERT INTO consumption_history (customer_id, consumption_date, consumption_amount) VALUES (2, TO_TIMESTAMP('2024-03-15 12:00:00', 'YYYY-MM-DD HH24:MI:SS'), 30);
+
+1 row created.
+
+SQL> INSERT INTO consumption_history (customer_id, consumption_date, consumption_amount) VALUES (2, TO_TIMESTAMP('2024-03-31 12:00:00', 'YYYY-MM-DD HH24:MI:SS'), 30);
+
+1 row created.
+
+
+package 1:-
+
+
+SQL> CREATE OR REPLACE PACKAGE customer_management_pkg AS
+  2      PROCEDURE add_customer(customer_id IN NUMBER, name IN VARCHAR2, address IN VARCHAR2);
+  3      PROCEDURE update_customer(customer_id IN NUMBER, name IN VARCHAR2, address IN VARCHAR2);
+  4      PROCEDURE delete_customer(customer_id IN NUMBER);
+  5      FUNCTION get_customer_details(customer_id IN NUMBER) RETURN VARCHAR2;
+  6  END customer_management_pkg;
+  7  /
+
+Package created.
+
+SQL> CREATE OR REPLACE PACKAGE BODY customer_management_pkg AS
+  2      PROCEDURE add_customer(customer_id IN NUMBER, name IN VARCHAR2, address IN VARCHAR2) IS
+  3      BEGIN
+  4          INSERT INTO customers231 (customer_id, customer_name, customer_address)
+  5          VALUES (customer_id, name, address);
+  6          COMMIT;
+  7      END add_customer;
+  8
+  9      PROCEDURE update_customer(customer_id IN NUMBER, name IN VARCHAR2, address IN VARCHAR2) IS
+ 10      BEGIN
+ 11          UPDATE customers231
+ 12          SET customer_name = name, customer_address = address
+ 13          WHERE customer_id = customer_id;
+ 14          COMMIT;
+ 15      END update_customer;
+ 16
+ 17      PROCEDURE delete_customer(customer_id IN NUMBER) IS
+ 18      BEGIN
+ 19          DELETE FROM customers231 WHERE customer_id = customer_id;
+ 20          COMMIT;
+ 21      END delete_customer;
+ 22
+ 23      FUNCTION get_customer_details(customer_id IN NUMBER) RETURN VARCHAR2 IS
+ 24          customer_info VARCHAR2(100);
+ 25      BEGIN
+ 26          SELECT customer_name || ', ' || customer_address
+ 27          INTO customer_info
+ 28          FROM customers231
+ 29          WHERE customer_id = customer_id;
+ 30
+ 31          RETURN customer_info;
+ 32      END get_customer_details;
+ 33  END customer_management_pkg;
+ 34  /
+
+
+Package body created.
+
+
+SQL> BEGIN
+  2      customer_management_pkg.add_customer(3, 'John Doe', '123 Main St'); -- Example call to add a new customer
+  3  END;
+  4  /
+
+PL/SQL procedure successfully completed.
+
+SQL> BEGIN
+  2      customer_management_pkg.update_customer(1, 'John Smith', '456 Oak St'); -- Example call to update customer details
+  3  END;
+  4  /
+
+PL/SQL procedure successfully completed.
+
+
+
+CUSTOMER_ID CUSTOMER_NAME
+----------- ----------------------------------------------------------------------------------------------------
+CUSTOMER_ADDRESS
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+          1 John Smith
+456 Oak St
+
+          2 John Smith
+456 Oak St
+
+          3 John Smith
+456 Oak St
+
+
+package 2:-
+
+ CREATE OR REPLACE PACKAGE billing_pkg AS
+  2      PROCEDURE generate_bill(customer_id IN NUMBER);
+  3      PROCEDURE calculate_charges(customer_id IN NUMBER);
+  4      PROCEDURE update_billing_info(customer_id IN NUMBER);
+  5  END billing_pkg;
+  6  /
+
+Package created.
+
+SQL> CREATE OR REPLACE PACKAGE payment_pkg AS
+  2      PROCEDURE record_payment(customer_id IN NUMBER, amount IN NUMBER);
+  3      FUNCTION check_payment_status(customer_id IN NUMBER) RETURN VARCHAR2;
+  4      PROCEDURE generate_payment_receipt(customer_id IN NUMBER);
+  5  END payment_pkg;
+  6  /
+
+Package created.
+
+SQL> CREATE OR REPLACE PACKAGE BODY payment_pkg AS
+  2      PROCEDURE record_payment(customer_id IN NUMBER, amount IN NUMBER) IS
+  3      BEGIN
+  4          -- Example logic to record payment for the specified customer
+  5          INSERT INTO payments (customer_id, payment_amount, payment_date)
+  6          VALUES (customer_id, amount, SYSDATE);
+  7
+  8          -- Update billing information to reflect the payment status
+  9          UPDATE bills
+ 10          SET payment_status = 'Paid'
+ 11          WHERE customer_id = customer_id;
+ 12
+ 13          COMMIT;
+ 14      END record_payment;
+ 15
+ 16      FUNCTION check_payment_status(customer_id IN NUMBER) RETURN VARCHAR2 IS
+ 17          payment_status VARCHAR2(20);
+ 18      BEGIN
+ 19          -- Example logic to check payment status for the specified customer
+ 20          SELECT payment_status
+ 21          INTO payment_status
+ 22          FROM bills
+ 23          WHERE customer_id = customer_id;
+ 24
+ 25          RETURN payment_status;
+ 26      END check_payment_status;
+ 27
+ 28      PROCEDURE generate_payment_receipt(customer_id IN NUMBER) IS
+ 29      BEGIN
+ 30          -- Example logic to generate payment receipt for the specified customer
+ 31          -- This could involve printing or emailing a receipt to the customer
+ 32          DBMS_OUTPUT.PUT_LINE('Payment receipt generated for customer ID: ' || customer_id);
+ 33      END generate_payment_receipt;
+ 34  END payment_pkg;
+ 35  /
+
+Package body created.
+
+SQL> BEGIN
+  2      payment_pkg.record_payment(1, 50); -- Example call to record a payment of 50 units for customer ID 1
+  3  END;
+  4  /
+
+PL/SQL procedure successfully completed.
+
+
+> BEGIN
+  2      payment_pkg.record_payment(1, 50); -- Example call to record a payment of 50 units for customer ID 1
+  3  END;
+  4  /
+
+PL/SQL procedure successfully completed.
+
+SQL> select * from bills;
+
+CUSTOMER_ID BILL_AMOUNT BILL_DATE PAYMENT_STATUS
+----------- ----------- --------- --------------------
+          1         7.5 15-MAR-24 Paid
+          1         7.5 31-MAR-24 Paid
+          2           3 15-MAR-24 Paid
+          2           3 31-MAR-24 Paid
+
+
+DECLARE
+  2      payment_status VARCHAR2(20);
+  3  BEGIN
+  4      payment_status := payment_pkg.check_payment_status(1); -- Example call to check payment status for customer ID 1
+  5      DBMS_OUTPUT.PUT_LINE('Payment Status: ' || payment_status);
+  6  END;
+  7  /
+DECLARE
+*
+ERROR at line 1:
+ORA-01422: exact fetch returns more than requested number of rows
+ORA-06512: at "SYSTEM.PAYMENT_PKG", line 20
+ORA-06512: at line 4
+
+
+
+
+SQL> BEGIN
+  2      payment_pkg.generate_payment_receipt(1); -- Example call to generate payment receipt for customer ID 1
+  3  END;
+  4  /
+
+PL/SQL procedure successfully completed.
+
+SQL> select * from payments;
+
+CUSTOMER_ID PAYMENT_AMOUNT PAYMENT_D
+----------- -------------- ---------
+          1             15 20-MAR-24
+          2              6 25-MAR-24
+          1             50 08-APR-24
+
+
+
+package 3:
+
+
+
+SQL> CREATE OR REPLACE PACKAGE usage_tracking_pkg AS
+  2      PROCEDURE record_meter_reading(customer_id IN NUMBER, reading IN NUMBER);
+  3      PROCEDURE calculate_consumption(customer_id IN NUMBER);
+  4      PROCEDURE generate_usage_report(customer_id IN NUMBER);
+  5  END usage_tracking_pkg;
+  6  /
+
+Package created.
+
+SQL> CREATE OR REPLACE PACKAGE BODY usage_tracking_pkg AS
+  2      PROCEDURE record_meter_reading(customer_id IN NUMBER, reading IN NUMBER) IS
+  3      BEGIN
+  4          -- Example logic to record meter reading for the specified customer
+  5          INSERT INTO meter_readings231 (customer_id, reading_date, meter_reading)
+  6          VALUES (customer_id, SYSDATE, reading);
+  7          COMMIT;
+  8      END record_meter_reading;
+  9
+ 10      PROCEDURE calculate_consumption(customer_id IN NUMBER) IS
+ 11      BEGIN
+ 12          -- Example logic to calculate consumption for the specified customer
+ 13          -- This could involve calculating the difference between current and previous meter readings
+ 14          -- and storing the consumption in a table
+ 15          INSERT INTO consumption_history (customer_id, consumption_date, consumption_amount)
+ 16          SELECT customer_id, SYSDATE, (current_reading - previous_reading)
+ 17          FROM (
+ 18              SELECT customer_id,
+ 19                     LAG(meter_reading) OVER (PARTITION BY customer_id ORDER BY reading_date) AS previous_reading,
+ 20                     meter_reading AS current_reading
+ 21              FROM meter_readings231
+ 22              WHERE customer_id = customer_id
+ 23          );
+ 24          COMMIT;
+ 25      END calculate_consumption;
+ 26
+ 27      PROCEDURE generate_usage_report(customer_id IN NUMBER) IS
+ 28      BEGIN
+ 29          -- Example logic to generate usage report for the specified customer
+ 30          -- This could involve querying consumption data and formatting it for reporting
+ 31          -- For simplicity, let's just print the consumption data for now
+ 32          FOR usage_rec IN (SELECT * FROM consumption_history WHERE customer_id = customer_id) LOOP
+ 33              DBMS_OUTPUT.PUT_LINE('Date: ' || usage_rec.consumption_date || ', Consumption: ' || usage_rec.consumption_amount);
+ 34          END LOOP;
+ 35      END generate_usage_report;
+ 36  END usage_tracking_pkg;
+ 37  /
+
+Package body created.
+
+SQL> BEGIN
+  2      usage_tracking_pkg.generate_usage_report(1); -- Example call to generate usage report for customer ID 1
+  3  END;
+  4  /
+
+PL/SQL procedure successfully completed.
+
+SQL> select * from  consumption_history;
+
+CUSTOMER_ID CONSUMPTION_DATE                                               CONSUMPTION_AMOUNT
+----------- --------------------------------------------------------------------------- ------------------
+          1 15-MAR-24 12.00.00.000000 PM                                   25
+          1 31-MAR-24 12.00.00.000000 PM                                   25
+          2 15-MAR-24 12.00.00.000000 PM                                   30
+          2 31-MAR-24 12.00.00.000000 PM                                   30
+
+SQL> BEGIN
+  2      usage_tracking_pkg.calculate_consumption(1); -- Example call to calculate consumption for customer ID 1
+  3  END;
+  4  /
+
+PL/SQL procedure successfully completed.
+
+SQL> select * from paymenys;
+select * from paymenys
+              *
+ERROR at line 1:
+ORA-00942: table or view does not exist
+
+
+SQL> select * from payments;
+
+CUSTOMER_ID PAYMENT_AMOUNT PAYMENT_D
+----------- -------------- ---------
+          1             15 20-MAR-24
+          2              6 25-MAR-24
+          1             50 08-APR-24
+
+
+
+function package:-
+
+Connected.
+SQL> CREATE OR REPLACE PACKAGE usage_tracking_pkg AS
+  2      FUNCTION record_meter_reading(customer_id IN NUMBER, reading IN NUMBER) RETURN BOOLEAN;
+  3      FUNCTION calculate_consumption(customer_id IN NUMBER) RETURN NUMBER;
+  4      FUNCTION generate_usage_report(customer_id IN NUMBER) RETURN VARCHAR2;
+  5  END usage_tracking_pkg;
+  6  /
+
+Package created.
+
+SQL> CREATE OR REPLACE PACKAGE BODY usage_tracking_pkg AS
+  2      FUNCTION record_meter_reading(customer_id IN NUMBER, reading IN NUMBER) RETURN BOOLEAN IS
+  3      BEGIN
+  4          -- Example logic to record meter reading for the specified customer
+  5          INSERT INTO meter_readings231 (customer_id, reading_date, meter_reading)
+  6          VALUES (customer_id, SYSDATE, reading);
+  7          COMMIT;
+  8          RETURN TRUE; -- Return TRUE if the meter reading is recorded successfully
+  9      EXCEPTION
+ 10          WHEN OTHERS THEN
+ 11              RETURN FALSE; -- Return FALSE if an exception occurs
+ 12      END record_meter_reading;
+ 13
+ 14      FUNCTION calculate_consumption(customer_id IN NUMBER) RETURN NUMBER IS
+ 15          consumption_amount NUMBER;
+ 16      BEGIN
+ 17          -- Example logic to calculate consumption for the specified customer
+ 18          -- This could involve calculating the difference between current and previous meter readings
+ 19          -- and storing the consumption in a variable
+ 20          SELECT (current_reading - previous_reading)
+ 21          INTO consumption_amount
+ 22          FROM (
+ 23              SELECT LAG(meter_reading) OVER (PARTITION BY customer_id ORDER BY reading_date) AS previous_reading,
+ 24                     meter_reading AS current_reading
+ 25              FROM meter_readings231
+ 26              WHERE customer_id = calculate_consumption.customer_id
+ 27          )
+ 28          WHERE ROWNUM = 1; -- Fetch only one row
+ 29
+ 30          RETURN consumption_amount;
+ 31      EXCEPTION
+ 32          WHEN NO_DATA_FOUND THEN
+ 33              RETURN NULL; -- Return NULL if no consumption data is found
+ 34      END calculate_consumption;
+ 35
+ 36      FUNCTION generate_usage_report(customer_id IN NUMBER) RETURN VARCHAR2 IS
+ 37          usage_report VARCHAR2(4000);
+ 38      BEGIN
+ 39          -- Example logic to generate usage report for the specified customer
+ 40          -- This could involve querying consumption data and formatting it for reporting
+ 41          -- For simplicity, let's just prepare a string report
+ 42          FOR usage_rec IN (SELECT * FROM consumption_history WHERE customer_id = generate_usage_report.customer_id) LOOP
+ 43              usage_report := usage_report || 'Date: ' || TO_CHAR(usage_rec.consumption_date, 'YYYY-MM-DD') || ', Consumption: ' || usage_rec.consumption_amount || CHR(10);
+ 44          END LOOP;
+ 45          RETURN usage_report;
+ 46      EXCEPTION
+ 47          WHEN NO_DATA_FOUND THEN
+ 48              RETURN 'No usage data found for the customer'; -- Return a message if no usage data is found
+ 49      END generate_usage_report;
+ 50  END usage_tracking_pkg;
+ 51  /
+
+Package body created.
+
+SQL> DECLARE
+  2      success BOOLEAN;
+  3  BEGIN
+  4      success := usage_tracking_pkg.record_meter_reading(1, 150);
+  5      IF success THEN
+  6          DBMS_OUTPUT.PUT_LINE('Meter reading recorded successfully.');
+  7      ELSE
+  8          DBMS_OUTPUT.PUT_LINE('Failed to record meter reading.');
+  9      END IF;
+ 10  END;
+ 11  /
+
+PL/SQL procedure successfully completed.
+
+SQL> set serverout on;
+SQL> DECLARE
+  2      success BOOLEAN;
+  3  BEGIN
+  4      success := usage_tracking_pkg.record_meter_reading(1, 150);
+  5      IF success THEN
+  6          DBMS_OUTPUT.PUT_LINE('Meter reading recorded successfully.');
+  7      ELSE
+  8          DBMS_OUTPUT.PUT_LINE('Failed to record meter reading.');
+  9      END IF;
+ 10  END;
+ 11  /
+Meter reading recorded successfully.
+
+PL/SQL procedure successfully completed.
+
+SQL> DECLARE
+  2      consumption_amount NUMBER;
+  3  BEGIN
+  4      consumption_amount := usage_tracking_pkg.calculate_consumption(1);
+  5      IF consumption_amount IS NOT NULL THEN
+  6          DBMS_OUTPUT.PUT_LINE('Calculated consumption amount: ' || consumption_amount);
+  7      ELSE
+  8          DBMS_OUTPUT.PUT_LINE('No consumption data found for the customer.');
+  9      END IF;
+ 10  END;
+ 11  /
+No consumption data found for the customer.
+
+PL/SQL procedure successfully completed.
+
